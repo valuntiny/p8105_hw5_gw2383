@@ -1,0 +1,18 @@
+---
+title: "p8105_hw5_gw2383"
+author: "Guojing Wu"
+date: "2018/11/3"
+output: html_document
+# output:
+#   github_document:
+#     toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tidyverse)
+```
+
+## Problem 1
+
+

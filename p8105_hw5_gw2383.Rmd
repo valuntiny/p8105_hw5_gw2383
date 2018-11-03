@@ -11,8 +11,42 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 library(tidyverse)
+
+theme_set(theme_bw())
 ```
 
 ## Problem 1
 
+###Create a tidy dataframe containing data from all participants
 
+```{r}
+exp_df = 
+  tibble(file_name = list.files("./data/", pattern = "*")) %>% 
+  mutate(data = map(.x = str_c("./data/", file_name, sep=""), ~ read.csv(.x))) %>% # read data
+  separate(file_name, into = c("filename", "postfix"), sep = "\\.") %>% 
+  select(-postfix) %>% # remove postfix
+  separate(filename, into = c("group", "id"), sep = "_", remove = F) %>% 
+  unnest() %>% 
+  gather(key = weeks, value = observation, week_1:week_8) %>% # gathering, tidy the data
+  separate(weeks, into = c("prefix", "weeks"), sep = "_") %>% 
+  select(-prefix) %>% # remove prefix
+  mutate(
+    filename = factor(filename), 
+    group = factor(group, levels = c("exp", "con")), 
+    id = factor(id), 
+    weeks = factor(weeks)
+  ) # transfer to factor
+
+exp_df
+```
+
+### a spaghetti plot showing observations on each subject over time
+
+```{r, dpi = 300}
+exp_df %>% 
+  ggplot(aes(x = weeks, y = observation, group = id, col = id)) +
+  geom_line() +
+  facet_grid(group ~ .)
+```
+
+In this plot we can see the observations in `exp` group are higher than observations in `con` group in general (p.value = `r t.test(observation ~ group, data = exp_df, alternative = "greater")$p.value`).

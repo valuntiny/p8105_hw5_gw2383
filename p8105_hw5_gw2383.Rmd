@@ -2,10 +2,10 @@
 title: "p8105_hw5_gw2383"
 author: "Guojing Wu"
 date: "2018/11/3"
-output: html_document
-# output:
-#   github_document:
-#     toc: true
+# output: html_document
+output:
+  github_document:
+    toc: true
 ---
 
 ```{r setup, include=FALSE}
@@ -21,8 +21,8 @@ theme_set(theme_bw())
 
 ```{r}
 exp_df = 
-  tibble(file_name = list.files("./data/", pattern = "*")) %>% 
-  mutate(data = map(.x = str_c("./data/", file_name, sep=""), ~ read.csv(.x))) %>% # read data
+  tibble(file_name = list.files("./data/problem1/", pattern = "*")) %>% 
+  mutate(data = map(.x = str_c("./data/problem1/", file_name, sep=""), ~ read.csv(.x))) %>% # read data
   separate(file_name, into = c("filename", "postfix"), sep = "\\.") %>% 
   select(-postfix) %>% # remove postfix
   separate(filename, into = c("group", "id"), sep = "_", remove = F) %>% 
@@ -42,11 +42,85 @@ exp_df
 
 ### a spaghetti plot showing observations on each subject over time
 
-```{r, dpi = 300}
+```{r, dpi = 300, out.width = "80%"}
 exp_df %>% 
-  ggplot(aes(x = weeks, y = observation, group = id, col = id)) +
-  geom_line() +
-  facet_grid(group ~ .)
+  ggplot(aes(x = weeks, y = observation, group = filename, col = group)) +
+  geom_line()
 ```
 
 In this plot we can see the observations in `exp` group are higher than observations in `con` group in general (p.value = `r t.test(observation ~ group, data = exp_df, alternative = "greater")$p.value`).
+
+## Problem 2
+
+### Describe the raw data
+
+```{r}
+homi_df = 
+  read.csv("./data/problem2/homicide-data.csv") %>% 
+  janitor::clean_names() %>% 
+  mutate(city_state = paste(city, state, sep = ", "))
+```
+
+So in this dataset we have `r dim(homi_df)[1]` observations, and `r dim(homi_df)[2]` variables include: `r colnames(homi_df)`
+
+The total number of homicides and the number of unsolved homicides within cities are listed below:
+
+```{r}
+homi_stat = 
+  homi_df %>% 
+  group_by(city_state) %>% 
+  summarise(
+    unsolved = sum(disposition %in% c("Closed without arrest", "Open/No arrest")), 
+    total_number = n()
+    )
+
+knitr::kable(homi_stat)
+```
+
+We noticed there is one row really strange: 
+`r homi_stat %>% filter(min_rank(total_number) == 1) %>%  knitr::kable()`
+But there doesn't seem to have a good explanation so we'll just leave it there.
+
+### For the city of Baltimore, MD, use the `prop.test` function to estimate the proportion of homicides that are unsolved
+
+```{r}
+# a function that doing the prop.test for homi_stat
+city_pt = function(df) {
+  prop.test(x = df$unsolved, n = df$total_number) %>% 
+    broom::tidy()
+}
+
+output = 
+  homi_stat %>% 
+  filter(city_state == "Baltimore, MD") %>% 
+  city_pt()
+
+output %>% 
+  select(estimate, conf.low, conf.high) %>% 
+  knitr::kable()
+```
+
+### run `prop.test` for each of the cities
+
+```{r}
+output_all = 
+  homi_stat %>% 
+  nest(unsolved, total_number) %>% 
+  mutate(prop_test = map(.x = data, ~city_pt(.x))) %>% 
+  unnest() %>% 
+  select(city_state, estimate, conf.low, conf.high)
+
+head(output_all,10)
+```
+
+Create a plot that shows the estimates and CIs for each city
+
+```{r, dpi = 300, out.width = "100%"}
+output_all %>% 
+  ggplot(aes(x = reorder(city_state, estimate), y = estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high)) +
+  labs(x = "city") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
